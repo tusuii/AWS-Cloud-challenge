@@ -1,4 +1,128 @@
 
+## test working endpoint in browser console 
+``` js
+// Test in browser console:
+fetch("https://guppaptxm6elewgoth2erzy4qm0cfoxe.lambda-url.us-east-1.on.aws/")
+  .then(r => r.json())
+  .then(console.log);
+```
+## 5. CloudFront caching
+If you recently updated files, CloudFront might be serving cached versions. Either:
+• Wait 5-10 minutes
+• Or invalidate CloudFront cache:
+``` bash
+aws cloudfront create-invalidation --distribution-id E1KPHFE6PQNOJT --paths "/*" --region us-east-1
+```
+
+
+# quick fixes using AWS CLI
+## Quick Fix Commands:
+
+1. Update S3 bucket policy:
+bash
+aws s3api put-bucket-policy --bucket k21-cloud-resume-challenge --policy file://bucket-policy.json --region us-east-1
+
+
+2. Update CloudFront distribution (you'll need to get the config, modify it, and update):
+bash
+# Get current config
+aws cloudfront get-distribution-config --id E1KPHFE6PQNOJT --region us-east-1 > distribution-config.json
+
+# Edit the JSON to fix:
+# - Change OriginPath from "/chef-website-template/*" to "/chef-website-template"  
+# - Add "DefaultRootObject": "index.html"
+
+# Update distribution
+aws cloudfront update-distribution --id E1KPHFE6PQNOJT --distribution-config file://modified-config.json --if-match ETAG_VALUE --region us-east-1
+
+
+## Get SSL Certificate
+# Request SSL certificate in us-east-1 (required for CloudFront)
+``` bash
+aws acm request-certificate \
+    --domain-name domain4myproject.online \
+    --domain-name www.domain4myproject.online \
+    --validation-method DNS \
+    --region us-east-1
+```
+
+## Validate Certificate
+# Get certificate details
+``` bash
+aws acm describe-certificate --certificate-arn YOUR_CERT_ARN --region us-east-1
+```
+# Add the DNS validation records to your Route 53 hosted zone
+``` bash
+aws route53 change-resource-record-sets --hosted-zone-id YOUR_HOSTED_ZONE_ID --change-batch file://validation-records.json
+```
+
+## Update CloudFront Distribution
+
+# Get current distribution config
+``` bash
+aws cloudfront get-distribution-config --id E1KPHFE6PQNOJT --region us-east-1 > current-config.json
+```
+# Edit the config to add:
+# - "Aliases": ["domain4myproject.online", "www.domain4myproject.online"]
+# - "ViewerCertificate": {"AcmCertificateArn": "YOUR_CERT_ARN", "SSLSupportMethod": "sni-only"}
+
+# Update distribution
+``` bash
+aws cloudfront update-distribution --id E1KPHFE6PQNOJT --distribution-config file://updated-config.json --if-match ETAG --region us-east-1
+```
+
+##  Create Route 53 Records
+bash
+# Create A record for domain4myproject.online
+``` bash
+aws route53 change-resource-record-sets --hosted-zone-id YOUR_HOSTED_ZONE_ID --change-batch '{
+    "Changes": [{
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+            "Name": "domain4myproject.online",
+            "Type": "A",
+            "AliasTarget": {
+                "DNSName": "d1z3vmyl06pkv4.cloudfront.net",
+                "EvaluateTargetHealth": false,
+                "HostedZoneId": "Z2FDTNDATAQYW2"
+            }
+        }
+    }]
+}'
+```
+# Create A record for www.domain4myproject.online
+``` bash
+aws route53 change-resource-record-sets --hosted-zone-id YOUR_HOSTED_ZONE_ID --change-batch '{
+    "Changes": [{
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+            "Name": "www.domain4myproject.online",
+            "Type": "A",
+            "AliasTarget": {
+                "DNSName": "d1z3vmyl06pkv4.cloudfront.net",
+                "EvaluateTargetHealth": false,
+                "HostedZoneId": "Z2FDTNDATAQYW2"
+            }
+        }
+    }]
+}'
+
+```
+
+### ✅ Domain & SSL
+• Domain: domain4myproject.online ✅
+• SSL Certificate: ISSUED and in use ✅
+• HTTPS working: HTTP/2 200 ✅
+
+### ✅ DNS Records
+• A record: Points to CloudFront ✅
+• AAAA record: IPv6 support ✅
+• NS records: Properly configured ✅
+
+### ✅ Infrastructure
+• CloudFront: Serving content with cache hits ✅
+• S3: Properly configured ✅
+• Lambda: Counter working (33 views) ✅
 
 
 
@@ -30,7 +154,7 @@ Issue: Website not accessible via CloudFront URL
 
 ### 4. Lambda Function Response Format
 Issue: Function URL returned raw data instead of proper HTTP response
-python
+
 # Problem: Return raw data
 return views
 
@@ -45,13 +169,13 @@ return {
 
 ### 5. JavaScript Counter Display
 Issue: Counter showed [object Object] instead of number
-javascript
+``` javascript
 // Problem: Displaying entire object
 counter.innerHTML = `👀 Views: ${data}`;
 
 // Solution: Access views property
 counter.innerHTML = `👀 Views: ${data.views}`;
-
+```
 
 ### 6. S3 Bucket Access
 Issue: CloudFront couldn't access S3 bucket
